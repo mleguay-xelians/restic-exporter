@@ -358,6 +358,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     restic_repo_password_file = os.environ.get("RESTIC_PASSWORD_FILE")
+    restic_repo_password = os.environ.get("RESTIC_PASSWORD_FILE")
     if restic_repo_password_file is None:
         restic_repo_password_file = os.environ.get("RESTIC_REPO_PASSWORD_FILE")
         if restic_repo_password_file is not None:
@@ -365,8 +366,8 @@ if __name__ == "__main__":
                 "The environment variable RESTIC_REPO_PASSWORD_FILE is deprecated, "
                 "please use RESTIC_PASSWORD_FILE instead."
             )
-    if restic_repo_password_file is None:
-        logging.error("The environment variable RESTIC_PASSWORD_FILE is mandatory")
+    if restic_repo_password_file is None or restic_repo_password is None:
+        logging.error("The environment variable RESTIC_PASSWORD_FILE or RESTIC_PASSWORD is mandatory")
         sys.exit(1)
 
     exporter_address = os.environ.get("LISTEN_ADDRESS", "0.0.0.0")
