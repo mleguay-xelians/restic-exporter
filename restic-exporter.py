@@ -16,24 +16,43 @@ from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily, REGIS
 
 class ResticCollector(object):
     def __init__(
-        self, repository, password_file, exit_on_error, disable_check,
-            disable_stats, disable_locks, include_paths
+        self, repository, exit_on_error, disable_check,
+            disable_stats, disable_locks, include_paths, insecure_tls, no_cache
     ):
         self.repository = repository
-        self.password_file = password_file
         self.exit_on_error = exit_on_error
         self.disable_check = disable_check
         self.disable_stats = disable_stats
         self.disable_locks = disable_locks
         self.include_paths = include_paths
+        self.insecure_tls = insecure_tls
+        self.no_cache = no_cache
         # todo: the stats cache increases over time -> remove old ids
         # todo: cold start -> the stats cache could be saved in a persistent volume
         # todo: cold start -> the restic cache (/root/.cache/restic) could be
         # saved in a persistent volume
+
         self.stats_cache = {}
         self.metrics = {}
         self.refresh(exit_on_error)
 
+    def get_restic_base_command(self):
+        cmd = [
+            "restic",
+            "-r",
+            self.repository,
+            "--no-lock",
+            "--json"
+        ]
+
+        if self.insecure_tls:
+            self.cli_base_command.extend(["--insecure-tls"])
+        
+        if self.no_cache:
+            self.cli_base_command.extend(["--no-cache"])
+
+        return cmd
+    
     def collect(self):
         logging.debug("Incoming request")
 
@@ -224,16 +243,10 @@ class ResticCollector(object):
         return metrics
 
     def get_snapshots(self, only_latest=False):
-        cmd = [
-            "restic",
-            "-r",
-            self.repository,
-            "-p",
-            self.password_file,
-            "--no-lock",
-            "snapshots",
-            "--json",
-        ]
+        cmd = self.get_restic_base_command()
+        cmd.extend([
+            "snapshots"
+        ])
 
         if only_latest:
             cmd.extend(["--latest", "1"])
@@ -257,19 +270,14 @@ class ResticCollector(object):
         if snapshot_id is not None and snapshot_id in self.stats_cache:
             return self.stats_cache[snapshot_id]
 
-        cmd = [
-            "restic",
-            "-r",
-            self.repository,
-            "-p",
-            self.password_file,
-            "--no-lock",
-            "stats",
-            "--json",
-        ]
+        cmd = self.get_restic_base_command()
+        cmd.extend([
+            "stats"
+        ])
+
         if snapshot_id is not None:
             cmd.extend([snapshot_id])
-
+        
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
             raise Exception(
@@ -284,15 +292,10 @@ class ResticCollector(object):
 
     def get_check(self):
         # This command takes 20 seconds or more, but it's required
-        cmd = [
-            "restic",
-            "-r",
-            self.repository,
-            "-p",
-            self.password_file,
-            "--no-lock",
-            "check",
-        ]
+        cmd = self.get_restic_base_command()
+        cmd.extend([
+            "check"
+        ])
 
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode == 0:
@@ -304,16 +307,11 @@ class ResticCollector(object):
             return 0  # error
 
     def get_locks(self):
-        cmd = [
-            "restic",
-            "-r",
-            self.repository,
-            "-p",
-            self.password_file,
-            "--no-lock",
+        cmd = self.get_restic_base_command()
+        cmd.extend([
             "list",
-            "locks",
-        ]
+            "locks"
+        ])
 
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
