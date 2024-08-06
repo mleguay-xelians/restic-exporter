@@ -1,6 +1,6 @@
 FROM golang:1.20-alpine3.19 AS builder
 
-ENV RESTIC_VERSION 0.16.3
+ENV RESTIC_VERSION 0.17.0
 ENV CGO_ENABLED 0
 
 RUN cd /tmp \
@@ -14,7 +14,7 @@ RUN cd /tmp \
 
 FROM python:3.12-alpine3.19
 
-RUN apk add --no-cache --update openssh tzdata
+RUN apk add --no-cache --update tzdata
 
 COPY --from=builder /tmp/restic /usr/bin
 COPY entrypoint.sh requirements.txt /
